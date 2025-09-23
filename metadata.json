@@ -1,0 +1,7 @@
+{
+  "name": "Denver E-Bike Navigator",
+  "description": "An application for e-bike riders in Denver to plan routes with custom speed calculations, check weather, and find charging stations. It provides accurate ETAs based on your e-bike's speed, not a standard pedal bike.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
