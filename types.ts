@@ -45,13 +45,14 @@ export interface RouteInfoResponse {
 }
 
 export interface User {
-  username: string;
-  email: string;
-  picture: string;
+  uid: string;
+  username: string | null;
+  email: string | null;
+  picture: string | null;
 }
 
 export interface Friend {
-  id: string;
+  id: string; // This is the user's UID from Firestore
   username: string;
   location: Coordinates;
   isOnline: boolean;

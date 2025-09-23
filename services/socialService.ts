@@ -1,41 +1,112 @@
-import type { Friend } from '../types';
+import type { Dispatch, SetStateAction } from 'react';
+import type { Friend, Coordinates, User } from '../types';
+import firebase, { auth, firestore } from './firebase';
 
-const initialFriends: Friend[] = [
-    { id: 'friend-1', username: 'Alex', location: { lat: 39.75, lng: -104.99 }, isOnline: true },
-    { id: 'friend-2', username: 'Jess', location: { lat: 39.74, lng: -105.02 }, isOnline: true },
-    { id: 'friend-3', username: 'Mike', location: { lat: 39.73, lng: -104.98 }, isOnline: true },
-    { id: 'friend-4', username: 'Chloe', location: { lat: 39.76, lng: -104.95 }, isOnline: false },
-];
+export const signInWithGoogle = async (): Promise<void> => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithPopup(provider);
+};
 
-export function getInitialFriends(): Friend[] {
-    return initialFriends;
-}
+export const signOut = async (): Promise<void> => {
+    await auth.signOut();
+};
 
-// Simulates friends moving around randomly
-function updateFriendLocations(friends: Friend[]): Friend[] {
-    return friends.map(friend => {
-        if (friend.isOnline) {
-            return {
-                ...friend,
-                location: {
-                    lat: friend.location.lat + (Math.random() - 0.5) * 0.001,
-                    lng: friend.location.lng + (Math.random() - 0.5) * 0.001,
-                },
-            };
-        }
-        return friend;
+export const updateUserProfileOnLogin = async (user: firebase.User): Promise<void> => {
+    const userRef = firestore.collection('users').doc(user.uid);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+        await userRef.set({
+            uid: user.uid,
+            username: user.displayName,
+            email: user.email,
+            picture: user.photoURL,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+    }
+};
+
+export const setUserOnlineStatus = (uid: string, isOnline: boolean): void => {
+    const userRef = firestore.collection('users').doc(uid);
+    userRef.update({ isOnline, lastSeen: firebase.firestore.FieldValue.serverTimestamp() })
+        .catch(err => console.error("Error updating online status:", err));
+};
+
+export const updateUserLocation = (uid: string, location: Coordinates): void => {
+    const userRef = firestore.collection('users').doc(uid);
+    userRef.update({ location })
+        .catch(err => console.error("Error updating location:", err));
+};
+
+export const addFriendByEmail = async (currentUserId: string, friendEmail: string): Promise<string> => {
+    if (!friendEmail) throw new Error("Email cannot be empty.");
+
+    const usersRef = firestore.collection('users');
+    const querySnapshot = await usersRef.where('email', '==', friendEmail).limit(1).get();
+
+    if (querySnapshot.empty) {
+        throw new Error("User with that email not found.");
+    }
+
+    const friendDoc = querySnapshot.docs[0];
+    const friendId = friendDoc.id;
+    const friendData = friendDoc.data();
+
+    if (friendId === currentUserId) {
+        throw new Error("You can't add yourself as a friend.");
+    }
+
+    const currentUserFriendsRef = usersRef.doc(currentUserId).collection('friends').doc(friendId);
+    const friendUserFriendsRef = usersRef.doc(friendId).collection('friends').doc(currentUserId);
+
+    // Add friend to current user's friend list
+    await currentUserFriendsRef.set({
+        uid: friendId,
+        username: friendData.username,
+        addedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-}
 
-/**
- * Starts a timer to periodically update friend locations.
- * @param setFriends The React state setter function to call with updated friend data.
- * @returns A function to clear the interval timer.
- */
-export function startLocationUpdates(setFriends: React.Dispatch<React.SetStateAction<Friend[]>>): () => void {
-    const intervalId = setInterval(() => {
-        setFriends(prevFriends => updateFriendLocations(prevFriends));
-    }, 3000); // Update every 3 seconds
+    // Add current user to friend's friend list
+    const currentUserDoc = await usersRef.doc(currentUserId).get();
+    const currentUserData = currentUserDoc.data();
+    await friendUserFriendsRef.set({
+        uid: currentUserId,
+        username: currentUserData?.username,
+        addedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return `Successfully added ${friendData.username} as a friend!`;
+};
 
-    return () => clearInterval(intervalId);
-}
+
+export const streamFriendsData = (uid: string, setFriends: Dispatch<SetStateAction<Friend[]>>): (() => void) => {
+    const friendsRef = firestore.collection('users').doc(uid).collection('friends');
+
+    const unsubscribeFromFriendsList = friendsRef.onSnapshot(async snapshot => {
+        if (snapshot.empty) {
+            setFriends([]);
+            return;
+        }
+
+        const friendUids = snapshot.docs.map(doc => doc.id);
+
+        const usersRef = firestore.collection('users');
+        const unsubscribeFromFriendDetails = usersRef.where(firebase.firestore.FieldPath.documentId(), 'in', friendUids)
+            .onSnapshot(usersSnapshot => {
+                const friendsData = usersSnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        username: data.username || 'No Name',
+                        location: data.location || { lat: 0, lng: 0 },
+                        isOnline: data.isOnline || false,
+                    };
+                });
+                setFriends(friendsData);
+            });
+
+        return () => unsubscribeFromFriendDetails();
+    });
+
+    return () => unsubscribeFromFriendsList();
+};

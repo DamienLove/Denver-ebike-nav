@@ -1,0 +1,30 @@
+{
+  "name": "Denver E-Bike Navigator",
+  "short_name": "E-Bike Nav",
+  "description": "An application for e-bike riders in Denver to plan routes with custom speed calculations, check weather, and find charging stations. It provides accurate ETAs based on your e-bike's speed, not a standard pedal bike.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Plan New Route",
+      "short_name": "New Route",
+      "description": "Start planning a new e-bike route",
+      "url": "/",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

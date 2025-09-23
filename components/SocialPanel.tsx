@@ -1,18 +1,15 @@
-
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { User, Friend } from '../types';
-import { UserIcon, UsersIcon, SearchIcon, UserPlusIcon, SignOutIcon, MapPinIcon } from './Icons';
+import { UserIcon, UsersIcon, SearchIcon, UserPlusIcon, SignOutIcon, MapPinIcon, GoogleIcon } from './Icons';
+import { addFriendByEmail } from '../services/socialService';
 
-// Let TypeScript know that the google object will be available on the window
-declare const google: any;
 
 interface SocialPanelProps {
     isOpen: boolean;
     onClose: () => void;
     user: User | null;
     friends: Friend[];
-    onLoginSuccess: (credentialResponse: any) => void;
+    onSignIn: () => void;
     onSignOut: () => void;
     onViewFriendOnMap: (friend: Friend) => void;
 }
@@ -41,39 +38,23 @@ const FriendListItem: React.FC<{ friend: Friend, onViewOnMap: (friend: Friend) =
     </li>
 );
 
-export const SocialPanel: React.FC<SocialPanelProps> = ({ isOpen, onClose, user, friends, onLoginSuccess, onSignOut, onViewFriendOnMap }) => {
+export const SocialPanel: React.FC<SocialPanelProps> = ({ isOpen, onClose, user, friends, onSignIn, onSignOut, onViewFriendOnMap }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [newFriendUsername, setNewFriendUsername] = useState('');
-    const signInButtonRef = useRef<HTMLDivElement>(null);
+    const [newFriendEmail, setNewFriendEmail] = useState('');
+    const [addFriendStatus, setAddFriendStatus] = useState<{message: string; isError: boolean} | null>(null);
 
-    useEffect(() => {
-        if (isOpen && !user && signInButtonRef.current && typeof google !== 'undefined') {
-            google.accounts.id.initialize({
-                client_id: process.env.GOOGLE_CLIENT_ID, // Assumes GOOGLE_CLIENT_ID is in environment variables
-                callback: onLoginSuccess,
-            });
-            google.accounts.id.renderButton(
-                signInButtonRef.current,
-                { theme: "outline", size: "large", type: "standard", text: 'signin_with', width: '300' }
-            );
-            // Clean up the button on component unmount or state change to avoid duplicates
-            return () => {
-                if (signInButtonRef.current) {
-                    signInButtonRef.current.innerHTML = "";
-                }
-            };
-        }
-    }, [isOpen, user, onLoginSuccess]);
-
-    const handleSendRequest = () => {
-        if (!newFriendUsername.trim()) return;
-        alert(`Friend request sent to ${newFriendUsername}! (This is a mocked action)`);
-        setNewFriendUsername('');
-    };
-    
-    const handleAddFriendSubmit = (e: React.FormEvent) => {
+    const handleAddFriendSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        handleSendRequest();
+        if (!newFriendEmail.trim() || !user) return;
+
+        setAddFriendStatus(null);
+        try {
+            const result = await addFriendByEmail(user.uid, newFriendEmail);
+            setAddFriendStatus({ message: result, isError: false });
+            setNewFriendEmail('');
+        } catch (error: any) {
+            setAddFriendStatus({ message: error.message, isError: true });
+        }
     };
 
     const filteredFriends = friends.filter(friend => 
@@ -102,7 +83,13 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ isOpen, onClose, user,
                          <>
                             <div className="p-6 border-b border-gray-700/80">
                                 <div className="flex items-center space-x-4">
-                                    <img src={user.picture} alt={user.username} className="h-16 w-16 rounded-full"/>
+                                    {user.picture ? (
+                                        <img src={user.picture} alt={user.username || 'User'} className="h-16 w-16 rounded-full"/>
+                                    ): (
+                                        <div className="h-16 w-16 rounded-full bg-gray-700 flex items-center justify-center">
+                                            <UserIcon />
+                                        </div>
+                                    )}
                                     <div>
                                         <h3 className="text-xl font-bold text-white">{user.username}</h3>
                                         <p className="text-sm text-gray-400">{user.email}</p>
@@ -141,25 +128,28 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ isOpen, onClose, user,
                                     )}
                                 </ul>
                                 <form onSubmit={handleAddFriendSubmit}>
-                                    <label htmlFor="add-friend" className="block text-sm font-medium text-gray-300 mb-2">Add by Username</label>
+                                    <label htmlFor="add-friend" className="block text-sm font-medium text-gray-300 mb-2">Add by Email</label>
                                     <div className="flex space-x-2">
                                         <input
-                                            type="text"
+                                            type="email"
                                             id="add-friend"
-                                            value={newFriendUsername}
-                                            onChange={(e) => setNewFriendUsername(e.target.value)}
+                                            value={newFriendEmail}
+                                            onChange={(e) => setNewFriendEmail(e.target.value)}
                                             className="flex-grow pl-3 pr-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                                            placeholder="e.g., BikeMaster42"
+                                            placeholder="e.g., friend@example.com"
                                         />
                                         <button
                                             type="submit"
-                                            disabled={!newFriendUsername.trim()}
+                                            disabled={!newFriendEmail.trim()}
                                             className="p-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed transition-colors"
                                             aria-label="Send friend request"
                                         >
                                             <UserPlusIcon />
                                         </button>
                                     </div>
+                                    {addFriendStatus && (
+                                        <p className={`mt-2 text-sm ${addFriendStatus.isError ? 'text-red-400' : 'text-green-400'}`}>{addFriendStatus.message}</p>
+                                    )}
                                 </form>
                             </div>
                         </>
@@ -170,7 +160,13 @@ export const SocialPanel: React.FC<SocialPanelProps> = ({ isOpen, onClose, user,
                             </div>
                             <h3 className="mt-4 text-lg font-semibold text-white">Join Your Crew</h3>
                             <p className="mt-1 text-gray-400 text-sm max-w-xs">Sign in to see your friends on the map and plan group rides.</p>
-                            <div ref={signInButtonRef} className="mt-6"></div>
+                            <button
+                                onClick={onSignIn}
+                                className="mt-6 flex items-center justify-center bg-white text-gray-800 font-semibold py-2 px-6 rounded-lg hover:bg-gray-200 transition-colors shadow-md"
+                            >
+                                <GoogleIcon />
+                                <span className="ml-3">Sign in with Google</span>
+                            </button>
                         </div>
                     )}
                 </div>

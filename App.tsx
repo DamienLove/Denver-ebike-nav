@@ -4,12 +4,18 @@ import { RouteInfoPanel } from './components/MapPanel';
 import InteractiveMap from './components/InteractiveMap';
 import { SocialPanel } from './components/SocialPanel';
 import { getRouteInfo, getWeatherInfo } from './services/geminiService';
-import { getInitialFriends, startLocationUpdates } from './services/socialService';
+import { auth } from './services/firebase';
+import { 
+  signInWithGoogle, 
+  signOut, 
+  setUserOnlineStatus, 
+  updateUserLocation, 
+  streamFriendsData, 
+  updateUserProfileOnLogin 
+} from './services/socialService';
 import type { RouteDetails, ChargingStation, WeatherInfo, User, Friend, Coordinates } from './types';
 import { INITIAL_BIKE_SPEED } from './constants';
 import { LoadingIcon, LogoIcon, EbikeIcon, WarningIcon, UserIcon } from './components/Icons';
-
-declare const google: any;
 
 const LoadingOverlay: React.FC = () => (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-gray-900/70 backdrop-blur-sm">
@@ -50,20 +56,48 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state lifted from ControlsPanel
   const [origin, setOrigin] = useState<string>('Union Station, Denver');
   const [destination, setDestination] = useState<string>('Denver Botanic Gardens');
   const [bikeSpeed, setBikeSpeed] = useState<number>(INITIAL_BIKE_SPEED);
   const [motorWattage, setMotorWattage] = useState<string>('');
   const [batteryVoltage, setBatteryVoltage] = useState<string>('');
 
-  // Social and location features state
   const [user, setUser] = useState<User | null>(null);
-  const [friends, setFriends] = useState<Friend[]>(getInitialFriends());
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [isSocialPanelOpen, setIsSocialPanelOpen] = useState<boolean>(false);
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
   const [friendToFocus, setFriendToFocus] = useState<Friend | null>(null);
   const weatherFetchedRef = useRef(false);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async firebaseUser => {
+      if (firebaseUser) {
+        await updateUserProfileOnLogin(firebaseUser);
+        const appUser: User = {
+          uid: firebaseUser.uid,
+          username: firebaseUser.displayName,
+          email: firebaseUser.email,
+          picture: firebaseUser.photoURL,
+        };
+        setUser(appUser);
+        setUserOnlineStatus(firebaseUser.uid, true);
+      } else {
+        if (user) {
+          setUserOnlineStatus(user.uid, false);
+        }
+        setUser(null);
+        setFriends([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = streamFriendsData(user.uid, setFriends);
+    return () => unsubscribe();
+  }, [user]);
 
   useEffect(() => {
     const fetchWeather = async (coords?: Coordinates) => {
@@ -84,6 +118,9 @@ const App: React.FC = () => {
                     lng: position.coords.longitude,
                 };
                 setUserLocation(newLocation);
+                if (user) {
+                  updateUserLocation(user.uid, newLocation);
+                }
                 if (!weatherFetchedRef.current) {
                     weatherFetchedRef.current = true;
                     fetchWeather(newLocation);
@@ -93,50 +130,35 @@ const App: React.FC = () => {
                 console.error("Geolocation error:", err);
                 if (!weatherFetchedRef.current) {
                     weatherFetchedRef.current = true;
-                    fetchWeather(); // Fetch default weather for Denver
+                    fetchWeather();
                 }
             },
             { enableHighAccuracy: true }
         );
     } else {
-        // Geolocation not supported
         if (!weatherFetchedRef.current) {
             weatherFetchedRef.current = true;
             fetchWeather();
         }
     }
-
-    const stopUpdates = startLocationUpdates(setFriends);
     
     return () => {
         if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-        stopUpdates();
     };
-  }, []);
+  }, [user]);
 
-  const handleLoginSuccess = useCallback((credentialResponse: any) => {
+  const handleSignIn = useCallback(async () => {
     try {
-      const token = credentialResponse.credential;
-      const payloadBase64 = token.split('.')[1];
-      const decodedPayload = JSON.parse(atob(payloadBase64));
-
-      const loggedInUser: User = {
-        username: decodedPayload.name,
-        email: decodedPayload.email,
-        picture: decodedPayload.picture,
-      };
-      setUser(loggedInUser);
+      await signInWithGoogle();
       setIsSocialPanelOpen(false); // Close panel on successful login
     } catch (err) {
-      console.error("Failed to decode JWT or set user:", err);
+      console.error("Sign in failed:", err);
       setError("There was an error signing you in. Please try again.");
     }
   }, []);
 
-  const handleSignOut = useCallback(() => {
-    if (typeof google !== 'undefined') {
-      google.accounts.id.disableAutoSelect();
-    }
+  const handleSignOut = useCallback(async () => {
+    await signOut();
     setUser(null);
     setIsSocialPanelOpen(false);
   }, []);
@@ -213,8 +235,8 @@ const App: React.FC = () => {
             className="p-1 rounded-full bg-gray-800/50 hover:bg-gray-700/70 transition-colors"
             aria-label="Open profile and friends panel"
           >
-            {user ? (
-                <img src={user.picture} alt={user.username} className="h-8 w-8 rounded-full" />
+            {user && user.picture ? (
+                <img src={user.picture} alt={user.username || 'User'} className="h-8 w-8 rounded-full" />
             ) : (
                 <div className="p-1">
                     <UserIcon />
@@ -247,7 +269,7 @@ const App: React.FC = () => {
           onClose={() => setIsSocialPanelOpen(false)}
           user={user}
           friends={friends}
-          onLoginSuccess={handleLoginSuccess}
+          onSignIn={handleSignIn}
           onSignOut={handleSignOut}
           onViewFriendOnMap={handleViewFriendOnMap}
       />
