@@ -1,23 +1,20 @@
 {
-  "name": "denver-e-bike-navigator",
+  "name": "denver-ebike-navigator",
+  "version": "1.0.0",
+  "description": "An application for e-bike riders in Denver to plan routes, check weather, and find charging stations.",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "echo \"Please use a local web server to serve the project root directory.\"",
+    "build-android": "npm i && npx cap add android && npx cap sync && npx cap open android",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "@google/genai": "^1.20.0",
-    "firebase": "^12.3.0"
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/cli": "^6.1.0",
+    "@capacitor/core": "^6.1.0"
   }
 }

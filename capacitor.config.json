@@ -1,0 +1,6 @@
+{
+  "appId": "com.denverebike.navigator",
+  "appName": "Denver E-Bike Navigator",
+  "webDir": ".",
+  "bundledWebRuntime": false
+}
