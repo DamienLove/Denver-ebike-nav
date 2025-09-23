@@ -1,9 +1,10 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { ControlsPanel } from './components/ControlsPanel';
 import { RouteInfoPanel } from './components/MapPanel';
 import InteractiveMap from './components/InteractiveMap';
 import { SocialPanel } from './components/SocialPanel';
-import { getRouteInfo, getWeatherInfo } from './services/geminiService';
+import { getRouteInfo, getWeatherForecast } from './services/geminiService';
 import { auth } from './services/firebase';
 import { 
   signInWithGoogle, 
@@ -13,7 +14,7 @@ import {
   streamFriendsData, 
   updateUserProfileOnLogin 
 } from './services/socialService';
-import type { RouteDetails, ChargingStation, WeatherInfo, User, Friend, Coordinates } from './types';
+import type { RouteDetails, ChargingStation, DailyForecast, User, Friend, Coordinates } from './types';
 import { INITIAL_BIKE_SPEED } from './constants';
 import { LoadingIcon, LogoIcon, EbikeIcon, WarningIcon, UserIcon } from './components/Icons';
 
@@ -52,7 +53,7 @@ const ErrorMessage: React.FC<{ message: string }> = ({ message }) => (
 const App: React.FC = () => {
   const [routeDetails, setRouteDetails] = useState<RouteDetails | null>(null);
   const [chargingStations, setChargingStations] = useState<ChargingStation[]>([]);
-  const [weather, setWeather] = useState<WeatherInfo | null>(null);
+  const [forecast, setForecast] = useState<DailyForecast[] | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,8 +103,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchWeather = async (coords?: Coordinates) => {
         try {
-            const weatherData = await getWeatherInfo(coords?.lat, coords?.lng);
-            setWeather(weatherData);
+            const forecastData = await getWeatherForecast(coords?.lat, coords?.lng);
+            setForecast(forecastData);
         } catch (err) {
             console.error('Failed to fetch weather data:', err);
         }
@@ -250,7 +251,7 @@ const App: React.FC = () => {
         <ControlsPanel 
           onSearch={() => handleSearch(origin, destination)} 
           isLoading={isLoading} 
-          weather={weather}
+          forecast={forecast}
           origin={origin}
           setOrigin={setOrigin}
           destination={destination}

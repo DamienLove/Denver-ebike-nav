@@ -1,11 +1,12 @@
+
 import React, { useState } from 'react';
-import type { WeatherInfo } from '../types';
-import { LocationIcon, SpeedIcon, SunIcon, CloudIcon, RainIcon, WindIcon, CrosshairIcon } from './Icons';
+import type { DailyForecast } from '../types';
+import { LocationIcon, SpeedIcon, SunIcon, CloudIcon, RainIcon, WindIcon, CrosshairIcon, PartlyCloudyIcon } from './Icons';
 
 interface ControlsPanelProps {
   onSearch: () => void;
   isLoading: boolean;
-  weather: WeatherInfo | null;
+  forecast: DailyForecast[] | null;
   origin: string;
   setOrigin: (value: string) => void;
   destination: string;
@@ -18,36 +19,35 @@ interface ControlsPanelProps {
   setBatteryVoltage: (value: string) => void;
 }
 
-const WeatherSkeleton: React.FC = () => (
+const ForecastSkeleton: React.FC = () => (
     <div className="bg-gray-900/50 border border-gray-700 rounded-xl p-4 mt-6 animate-pulse">
-        <div className="h-4 bg-gray-700 rounded w-1/2 mb-4"></div>
-        <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-                <div className="h-8 w-8 bg-gray-700 rounded-full"></div>
-                <div>
-                    <div className="h-7 bg-gray-700 rounded w-16 mb-1"></div>
-                    <div className="h-3 bg-gray-700 rounded w-20"></div>
+        <div className="h-5 bg-gray-700 rounded w-1/2 mb-4"></div>
+        <div className="grid grid-cols-3 gap-3">
+            {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex flex-col items-center space-y-2 p-2 rounded-lg bg-gray-700/50">
+                    <div className="h-4 bg-gray-600 rounded w-10"></div>
+                    <div className="h-8 w-8 bg-gray-600 rounded-full"></div>
+                    <div className="h-4 bg-gray-600 rounded w-12"></div>
+                    <div className="h-3 bg-gray-600 rounded w-10"></div>
                 </div>
-            </div>
-            <div className="text-right">
-                <div className="h-5 bg-gray-700 rounded w-12 mb-1"></div>
-                <div className="h-3 bg-gray-700 rounded w-8"></div>
-            </div>
+            ))}
         </div>
     </div>
 );
 
-const WeatherDisplay: React.FC<{ weather: WeatherInfo | null }> = ({ weather }) => {
-    if (!weather) {
-        return <WeatherSkeleton />;
+const ForecastDisplay: React.FC<{ forecast: DailyForecast[] | null }> = ({ forecast }) => {
+    if (!forecast) {
+        return <ForecastSkeleton />;
     }
 
-    const getWeatherIcon = () => {
-        switch(weather.icon) {
+    const getWeatherIcon = (icon: DailyForecast['icon']) => {
+        switch(icon) {
             case 'sun': return <SunIcon />;
             case 'cloud': return <CloudIcon />;
             case 'rain': return <RainIcon />;
             case 'wind': return <WindIcon />;
+            case 'partly-cloudy': return <PartlyCloudyIcon />;
+            case 'snow': return <CloudIcon />; // Placeholder for snow
             default: return <SunIcon />;
         }
     }
@@ -55,32 +55,31 @@ const WeatherDisplay: React.FC<{ weather: WeatherInfo | null }> = ({ weather }) 
     const iconColor: { [key: string]: string } = {
         sun: 'text-yellow-400',
         cloud: 'text-gray-400',
+        'partly-cloudy': 'text-yellow-400/70',
         rain: 'text-blue-400',
-        wind: 'text-cyan-400'
+        wind: 'text-cyan-400',
+        snow: 'text-white'
     };
 
     return (
       <div className="bg-gray-900/50 border border-gray-700/80 rounded-xl p-4 mt-6">
-        <h3 className="font-semibold text-white mb-3 text-base">Current Conditions</h3>
-        <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-                <div className={iconColor[weather.icon] || 'text-gray-400'}>{getWeatherIcon()}</div>
-                <div>
-                    <p className="font-bold text-2xl text-white">{weather.temperature}°F</p>
-                    <p className="text-sm text-gray-400">{weather.condition}</p>
+        <h3 className="font-semibold text-white mb-3 text-base">3-Day Forecast</h3>
+        <div className="grid grid-cols-3 gap-2">
+            {forecast.slice(0, 3).map((day, index) => (
+                <div key={day.day} className={`flex flex-col items-center text-center p-2 rounded-lg ${index === 0 ? 'bg-blue-900/40' : 'bg-gray-700/30'}`}>
+                    <p className="font-bold text-sm text-white">{day.day.substring(0,3)}</p>
+                    <div className={`my-1.5 ${iconColor[day.icon] || 'text-gray-400'}`}>{getWeatherIcon(day.icon)}</div>
+                    <p className="font-bold text-base text-white">{day.high}°<span className="text-gray-400">/{day.low}°</span></p>
+                    <p className="text-xs text-gray-400 mt-1">{day.windSpeed} mph</p>
                 </div>
-            </div>
-            <div className="text-right">
-                <p className="font-semibold text-white">{weather.windSpeed} mph</p>
-                <p className="text-sm text-gray-400">Wind</p>
-            </div>
+            ))}
         </div>
       </div>
     );
   };
 
 export const ControlsPanel: React.FC<ControlsPanelProps> = ({ 
-    onSearch, isLoading, weather,
+    onSearch, isLoading, forecast,
     origin, setOrigin, destination, setDestination,
     bikeSpeed, setBikeSpeed, motorWattage, setMotorWattage,
     batteryVoltage, setBatteryVoltage
@@ -223,7 +222,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             </button>
         </div>
       </form>
-       <WeatherDisplay weather={weather} />
+       <ForecastDisplay forecast={forecast} />
     </div>
   );
 };

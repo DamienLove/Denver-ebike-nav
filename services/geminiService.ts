@@ -1,14 +1,13 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
-import type { RouteInfoResponse, WeatherInfo } from '../types';
+import type { RouteInfoResponse, DailyForecast } from '../types';
 
 // Initialize the Google AI client with the API key from environment variables.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
-export async function getWeatherInfo(lat?: number, lng?: number): Promise<WeatherInfo | null> {
+export async function getWeatherForecast(lat?: number, lng?: number): Promise<DailyForecast[] | null> {
   const model = "gemini-2.5-flash";
-  const prompt = lat && lng
-    ? `What is the current weather for latitude ${lat} and longitude ${lng}? Provide the condition, temperature in Fahrenheit, wind speed in mph, and an icon name from this list: 'sun', 'cloud', 'rain', 'wind'.`
-    : "What is the current weather in Denver, CO? Provide the condition, temperature in Fahrenheit, wind speed in mph, and an icon name from this list: 'sun', 'cloud', 'rain', 'wind'.";
+  const prompt = `Provide a 3-day weather forecast for ${lat && lng ? `latitude ${lat} and longitude ${lng}` : 'Denver, CO'}. The first day should be labeled "Today". For each day, provide a short weather condition description, high and low temperatures in Fahrenheit, average wind speed in mph, and an icon name from this list: 'sun', 'cloud', 'rain', 'wind', 'partly-cloudy', 'snow'.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -17,14 +16,19 @@ export async function getWeatherInfo(lat?: number, lng?: number): Promise<Weathe
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            condition: { type: Type.STRING },
-            temperature: { type: Type.NUMBER },
-            windSpeed: { type: Type.NUMBER },
-            icon: { type: Type.STRING },
-          },
-          required: ["condition", "temperature", "windSpeed", "icon"],
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    day: { type: Type.STRING },
+                    condition: { type: Type.STRING },
+                    high: { type: Type.NUMBER },
+                    low: { type: Type.NUMBER },
+                    windSpeed: { type: Type.NUMBER },
+                    icon: { type: Type.STRING },
+                },
+                required: ["day", "condition", "high", "low", "windSpeed", "icon"],
+            }
         },
       },
     });
@@ -32,17 +36,18 @@ export async function getWeatherInfo(lat?: number, lng?: number): Promise<Weathe
     const text = response.text.trim();
     if (!text) return null;
 
-    const weatherData = JSON.parse(text);
-    // Basic validation to ensure we have a valid object.
-    if (weatherData && typeof weatherData.temperature === 'number') {
-        return weatherData as WeatherInfo;
+    const forecastData = JSON.parse(text);
+    // Basic validation to ensure we have a valid array with expected objects.
+    if (Array.isArray(forecastData) && forecastData.length > 0 && forecastData[0].hasOwnProperty('high')) {
+        return forecastData as DailyForecast[];
     }
     return null;
   } catch (error) {
-    console.error("Error fetching weather info:", error);
+    console.error("Error fetching weather forecast:", error);
     return null;
   }
 }
+
 
 export async function getRouteInfo(
   origin: string,

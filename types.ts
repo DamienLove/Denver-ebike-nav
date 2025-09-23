@@ -1,3 +1,4 @@
+
 export interface Coordinates {
   lat: number;
   lng: number;
@@ -25,11 +26,13 @@ export interface RouteDetails {
   bikeSpeed: number; // mph
 }
 
-export interface WeatherInfo {
+export interface DailyForecast {
+  day: string; // e.g., "Today", "Monday"
   condition: string;
-  temperature: number; // in °F
+  high: number; // in °F
+  low: number; // in °F
   windSpeed: number; // in mph
-  icon: 'sun' | 'cloud' | 'rain' | 'wind';
+  icon: 'sun' | 'cloud' | 'rain' | 'wind' | 'partly-cloudy' | 'snow';
 }
 
 // The raw response from Gemini API for route info
