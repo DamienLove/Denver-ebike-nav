@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import type { DailyForecast } from '../types';
-import { LocationIcon, SpeedIcon, SunIcon, CloudIcon, RainIcon, WindIcon, CrosshairIcon, PartlyCloudyIcon, SnowIcon } from './Icons';
+import { LocationIcon, SpeedIcon, SunIcon, CloudIcon, RainIcon, WindIcon, CrosshairIcon, PartlyCloudyIcon } from './Icons';
 
 interface ControlsPanelProps {
   onSearch: () => void;
@@ -47,7 +47,7 @@ const ForecastDisplay: React.FC<{ forecast: DailyForecast[] | null }> = ({ forec
             case 'rain': return <RainIcon />;
             case 'wind': return <WindIcon />;
             case 'partly-cloudy': return <PartlyCloudyIcon />;
-            case 'snow': return <SnowIcon />;
+            case 'snow': return <CloudIcon />; // Placeholder for snow
             default: return <SunIcon />;
         }
     }
